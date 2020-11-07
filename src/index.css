@@ -10,6 +10,12 @@ main {
     width: 100%;
 }
 
+@media (max-width: 1000px) {
+    main {
+        flex-direction: column;
+    }
+}
+
 #editor {
     flex: 1;
 }
@@ -20,6 +26,13 @@ main {
     color: white;
     padding: 10px;
     overflow: auto;
+}
+
+@media (max-width: 1000px) {
+    #divider {
+        width: auto !important;
+        height: 4px;
+    }
 }
 
 #divider {

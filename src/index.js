@@ -11,6 +11,7 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
     value: defaultScript,
     language: 'lua',
     theme: 'vs-dark',
+    automaticLayout: true
 });
 
 const output = document.getElementById('output');

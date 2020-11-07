@@ -24,6 +24,8 @@ const executeLuaCode = () => {
     try {
         state.registerStandardLib();
         state.setGlobal('print', (...args) => {
+            args = args.map(a => typeof a === 'object' ? '[#table]' : a);
+
             console.log(...args);
 
             const log = document.createElement('span');

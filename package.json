@@ -1,0 +1,35 @@
+{
+  "name": "try-lua",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "dependencies": {
+    "fontsource-cascadia-code": "3.0.5",
+    "monaco-editor": "0.21.2",
+    "wasmoon": "1.0.6"
+  },
+  "devDependencies": {
+    "css-loader": "5.0.1",
+    "file-loader": "6.2.0",
+    "html-webpack-plugin": "4.5.0",
+    "monaco-editor-webpack-plugin": "2.0.0",
+    "raw-loader": "4.0.2",
+    "style-loader": "2.0.0",
+    "webpack": "5.4.0",
+    "webpack-cli": "4.2.0"
+  },
+  "scripts": {
+    "start": "webpack --mode=development --watch --progress",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ceifa/try-lua.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ceifa/try-lua/issues"
+  },
+  "homepage": "https://github.com/ceifa/try-lua#readme"
+}

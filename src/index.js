@@ -17,10 +17,15 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
 const output = document.getElementById('output');
 
 const executeLuaCode = () => {
+    console.clear();
+    output.innerHTML = "";
+
     const state = new Lua();
     try {
         state.registerStandardLib();
         state.setGlobal('print', (...args) => {
+            console.log(...args);
+
             const log = document.createElement('span');
             log.innerText = args.join('\t');
             output.appendChild(log);

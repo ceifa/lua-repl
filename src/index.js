@@ -20,6 +20,13 @@ const executeLuaCode = () => {
     console.clear();
     output.innerHTML = "";
 
+    const addLog = (str) => {
+        const log = document.createElement('span');
+        log.innerText = str;
+        output.appendChild(log);
+        output.appendChild(document.createElement('br'));
+    }
+
     const state = new Lua();
     try {
         state.registerStandardLib();
@@ -27,13 +34,11 @@ const executeLuaCode = () => {
             args = args.map(a => typeof a === 'object' ? '[#table]' : a);
 
             console.log(...args);
-
-            const log = document.createElement('span');
-            log.innerText = args.join('\t');
-            output.appendChild(log);
-            output.appendChild(document.createElement('br'));
+            addLog(args.join('\t'))
         });
         state.doString(monacoEditor.getValue());
+    } catch (e) {
+        addLog(e.toString())
     } finally {
         state.close();
     }

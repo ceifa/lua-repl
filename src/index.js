@@ -31,9 +31,18 @@ const executeLuaCode = () => {
     try {
         state.registerStandardLib();
         state.setGlobal('print', (...args) => {
-            args = args.map(a => typeof a === 'object' ? '[#table]' : a);
-
             console.log(...args);
+
+            args = args.map(a => {
+                if (a === null) {
+                    return 'nil'
+                } else if (typeof a === 'object') {
+                    return '[#table]'
+                } else {
+                    return a
+                }
+            });
+
             addLog(args.join('\t'))
         });
         state.doString(monacoEditor.getValue());

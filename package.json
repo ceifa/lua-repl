@@ -6,7 +6,7 @@
   "dependencies": {
     "fontsource-cascadia-code": "3.0.5",
     "monaco-editor": "0.21.2",
-    "wasmoon": "1.0.6"
+    "wasmoon": "1.0.18"
   },
   "devDependencies": {
     "css-loader": "5.0.1",

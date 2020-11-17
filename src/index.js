@@ -38,6 +38,8 @@ const executeLuaCode = () => {
                     return 'nil'
                 } else if (typeof a === 'object') {
                     return '[#table]'
+                } else if (typeof a === 'function') {
+                    return '[#function]'
                 } else {
                     return a
                 }

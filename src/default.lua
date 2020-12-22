@@ -1,5 +1,5 @@
 function fibonacci(n)
-    current, next = 0, 1
+    local current, next = 0, 1
 
     for i = 1, n do
         print(current)

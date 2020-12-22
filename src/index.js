@@ -5,7 +5,7 @@ import defaultScript from './default.lua';
 
 import { editor } from 'monaco-editor';
 import wasmFile from 'wasmoon/dist/glue.wasm'
-import { Lua } from 'wasmoon';
+import { LuaFactory } from 'wasmoon';
 
 const monacoEditor = editor.create(document.getElementById('editor'), {
     value: defaultScript,
@@ -16,7 +16,7 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
 
 const output = document.getElementById('output');
 
-const executeLuaCode = () => {
+const executeLuaCode = async () => {
     console.clear();
     output.innerHTML = "";
 
@@ -27,10 +27,9 @@ const executeLuaCode = () => {
         output.appendChild(document.createElement('br'));
     }
 
-    const state = new Lua();
+    const state = await new LuaFactory(wasmFile).createEngine();
     try {
-        state.registerStandardLib();
-        state.setGlobal('print', (...args) => {
+        state.global.set('print', (...args) => {
             console.log(...args);
 
             args = args.map(a => {
@@ -51,18 +50,17 @@ const executeLuaCode = () => {
     } catch (e) {
         addLog(e.toString())
     } finally {
-        state.close();
+        state.global.close();
     }
 };
 
-Lua.ensureInitialization(wasmFile).then(executeLuaCode);
+executeLuaCode();
 
 monacoEditor.addAction({
     id: 'save-action',
     label: 'Save',
     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_S],
     run: async (editor) => {
-        await Lua.ensureInitialization(wasmFile);
-        executeLuaCode();
+        await executeLuaCode();
     },
 });

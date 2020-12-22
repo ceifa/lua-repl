@@ -1,5 +1,6 @@
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin')
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
 module.exports = {
@@ -20,7 +21,7 @@ module.exports = {
     module: {
         defaultRules: [
             {
-                type: "javascript/auto",
+                type: 'javascript/auto',
                 resolve: {}
             }
         ],
@@ -28,7 +29,7 @@ module.exports = {
             test: /\.css$/,
             use: ['style-loader', 'css-loader']
         }, {
-            type: "javascript/auto",
+            type: 'javascript/auto',
             test: /\.(ttf|wasm|woff|woff2)$/,
             use: ['file-loader']
         }, {
@@ -42,7 +43,12 @@ module.exports = {
         }),
         new HtmlWebpackPlugin({
             template: 'src/index.html'
-        })
+        }),
+        new CopyWebpackPlugin({
+            patterns: [
+                { from: 'src/assets', to: 'assets' },
+            ],
+        }),
     ],
     experiments: {
         asyncWebAssembly: true,

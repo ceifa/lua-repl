@@ -3,7 +3,7 @@ import 'fontsource-cascadia-code';
 import './index.css';
 import defaultScript from './default.lua';
 
-import { editor } from 'monaco-editor';
+import { editor, KeyMod } from 'monaco-editor';
 import wasmFile from 'wasmoon/dist/glue.wasm'
 import { LuaFactory } from 'wasmoon';
 
@@ -61,7 +61,7 @@ executeLuaCode();
 monacoEditor.addAction({
     id: 'save-action',
     label: 'Save',
-    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_S],
+    keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_S],
     run: async (editor) => {
         await executeLuaCode();
     },

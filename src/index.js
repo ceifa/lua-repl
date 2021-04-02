@@ -16,6 +16,8 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
 
 const output = document.getElementById('output');
 
+const factory = new LuaFactory(wasmFile);
+
 const executeLuaCode = async () => {
     console.clear();
     output.innerHTML = "";
@@ -27,7 +29,7 @@ const executeLuaCode = async () => {
         output.appendChild(document.createElement('br'));
     }
 
-    const state = await new LuaFactory(wasmFile).createEngine();
+    const state = await factory.createEngine();
     try {
         state.global.set('print', (...args) => {
             console.log(...args);

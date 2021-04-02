@@ -3,7 +3,7 @@ import 'fontsource-cascadia-code';
 import './index.css';
 import defaultScript from './default.lua';
 
-import { editor, KeyMod } from 'monaco-editor';
+import { editor, KeyMod, KeyCode } from 'monaco-editor';
 import wasmFile from 'wasmoon/dist/glue.wasm'
 import { LuaFactory } from 'wasmoon';
 

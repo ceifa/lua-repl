@@ -5,7 +5,7 @@ import defaultScript from './default.lua';
 
 import { editor, KeyMod, KeyCode } from 'monaco-editor';
 import wasmFile from 'wasmoon/dist/glue.wasm'
-import { LuaFactory } from 'wasmoon';
+import { decorateFunction, LuaFactory } from 'wasmoon';
 
 const monacoEditor = editor.create(document.getElementById('editor'), {
     value: defaultScript,
@@ -20,7 +20,7 @@ const factory = new LuaFactory(wasmFile);
 
 const executeLuaCode = async () => {
     console.clear();
-    output.innerHTML = "";
+    output.innerHTML = '';
 
     const addLog = (str) => {
         const log = document.createElement('span');
@@ -31,26 +31,21 @@ const executeLuaCode = async () => {
 
     const state = await factory.createEngine();
     try {
-        state.global.set('print', (...args) => {
-            console.log(...args);
+        state.global.set('print', decorateFunction((thread, argsQuantity) => {
+            const values = [];
+            for (let i = 1; i <= argsQuantity; i++) {
+                values.push(thread.indexToString(i));
+            }
 
-            args = args.map(a => {
-                if (a === null) {
-                    return 'nil'
-                } else if (typeof a === 'object') {
-                    return '[#table]'
-                } else if (typeof a === 'function') {
-                    return '[#function]'
-                } else {
-                    return a
-                }
-            });
-
-            addLog(args.join('\t'))
-        });
+            console.log(...values);
+            addLog(values.join('\t'));
+        }, {
+            receiveArgsQuantity: true,
+            receiveThread: true
+        }));
         state.doString(monacoEditor.getValue());
     } catch (e) {
-        addLog(e.toString())
+        addLog(e.toString());
     } finally {
         state.global.close();
     }
@@ -59,8 +54,8 @@ const executeLuaCode = async () => {
 executeLuaCode();
 
 monacoEditor.addAction({
-    id: 'save-action',
-    label: 'Save',
+    id: 'execute-action',
+    label: 'Execute code',
     keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_S],
     run: async (editor) => {
         await executeLuaCode();

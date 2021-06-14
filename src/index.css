@@ -20,6 +20,16 @@ main {
     flex: 1;
 }
 
+.tip {
+    position: absolute;
+    bottom: 1em;
+    left: 1em;
+    z-index: 5;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
 #output {
     flex: 1;
     background-color: rgb(13, 16, 30);

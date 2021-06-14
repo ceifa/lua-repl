@@ -11,7 +11,8 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
     value: defaultScript,
     language: 'lua',
     theme: 'vs-dark',
-    automaticLayout: true
+    automaticLayout: true,
+    fontFamily: 'Cascadia Code'
 });
 
 const output = document.getElementById('output');
@@ -43,21 +44,55 @@ const executeLuaCode = async () => {
             receiveArgsQuantity: true,
             receiveThread: true
         }));
-        state.doString(monacoEditor.getValue());
-    } catch (e) {
-        addLog(e.toString());
+        const result = await state.doString(monacoEditor.getValue());
+        if (result) {
+            addLog(result);
+        }
+    } catch (err) {
+        addLog(err.toString());
     } finally {
         state.global.close();
     }
 };
 
-executeLuaCode();
+(async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paste = urlParams.get('paste');
+
+    if (paste) {
+        try {
+            const res = await fetch('https://api.ceifa.tv/document/' + paste);
+            if (res.ok) {
+                monacoEditor.setValue(await res.text());
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    await executeLuaCode();
+})();
 
 monacoEditor.addAction({
     id: 'execute-action',
     label: 'Execute code',
+    keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
+    run: executeLuaCode
+});
+
+monacoEditor.addAction({
+    id: 'save-action',
+    label: 'Save code',
     keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_S],
     run: async (editor) => {
-        await executeLuaCode();
-    },
-});
+        const res = await fetch('https://api.ceifa.tv/documents', {
+            method: 'POST',
+            body: monacoEditor.getValue()
+        });
+
+        if (res.ok) {
+            const body = await res.json();
+            history.pushState(body, document.title, `?paste=${body.key}`)
+        }
+    }
+})

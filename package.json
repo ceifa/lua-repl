@@ -6,7 +6,7 @@
   "dependencies": {
     "fontsource-cascadia-code": "4.0.0",
     "monaco-editor": "0.24.0",
-    "wasmoon": "1.8.1"
+    "wasmoon": "1.8.2"
   },
   "devDependencies": {
     "copy-webpack-plugin": "9.0.0",

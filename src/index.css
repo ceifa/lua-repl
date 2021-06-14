@@ -38,6 +38,17 @@ main {
     overflow: auto;
 }
 
+.github {
+    position: absolute;
+    bottom: 1em;
+    right: 1em;
+    z-index: 5;
+}
+
+.github a {
+    color: wheat;
+}
+
 @media (max-width: 1000px) {
     #divider {
         width: auto !important;

@@ -6,7 +6,7 @@ main {
     font-family: "Cascadia Code";
     display: flex;
     align-items: stretch;
-    height: 100%;
+    height: 100vh;
     width: 100%;
 }
 

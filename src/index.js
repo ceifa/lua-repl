@@ -1,5 +1,5 @@
 import './reset.css';
-import 'fontsource-cascadia-code';
+import './assets/CascadiaMono.ttf';
 import './index.css';
 import defaultScript from './default.lua';
 
@@ -12,7 +12,8 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
     language: 'lua',
     theme: 'vs-dark',
     automaticLayout: true,
-    fontFamily: 'Cascadia Code'
+    fontLigatures: true,
+    fontFamily: 'Cascadia Code',
 });
 
 const output = document.getElementById('output');

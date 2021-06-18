@@ -1,7 +1,6 @@
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const TerserPlugin = require("terser-webpack-plugin");
 const path = require('path');
 
 const config = {
@@ -26,17 +25,19 @@ const config = {
                 resolve: {}
             }
         ],
-        rules: [{
-            test: /\.css$/,
-            use: ['style-loader', 'css-loader']
-        }, {
-            type: 'javascript/auto',
-            test: /\.(ttf|wasm|woff|woff2)$/,
-            use: ['file-loader']
-        }, {
-            test: /\.lua$/,
-            use: ['raw-loader']
-        }]
+        rules: [
+            {
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader']
+            },
+            {
+                type: 'javascript/auto',
+                test: /\.(ttf|wasm|woff|woff2)$/,
+                use: ['file-loader']
+            }, {
+                test: /\.lua$/,
+                use: ['raw-loader']
+            }]
     },
     plugins: [
         new MonacoWebpackPlugin({
@@ -57,13 +58,4 @@ const config = {
     }
 };
 
-module.exports = (env, argv) => {
-    if (argv.mode === 'production') {
-        config.optimization = {
-            minimize: true,
-            minimizer:  [new TerserPlugin()],
-        };
-    }
-
-    return config;
-}
+module.exports = config;

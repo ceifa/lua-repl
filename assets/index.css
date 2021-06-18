@@ -1,0 +1,62 @@
+html {
+    overflow: hidden;
+}
+
+main {
+    font-family: "Cascadia Code";
+    display: flex;
+    align-items: stretch;
+    height: 100vh;
+    width: 100%;
+}
+
+@media (max-width: 1000px) {
+    main {
+        flex-direction: column;
+    }
+}
+
+#editor {
+    flex: 1;
+}
+
+.tip {
+    position: absolute;
+    bottom: 1em;
+    left: 1em;
+    z-index: 5;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+#output {
+    flex: 1;
+    background-color: rgb(13, 16, 30);
+    color: white;
+    padding: 10px;
+    overflow: auto;
+}
+
+.github {
+    position: absolute;
+    bottom: 1em;
+    right: 1em;
+    z-index: 5;
+}
+
+.github a {
+    color: wheat;
+}
+
+@media (max-width: 1000px) {
+    #divider {
+        width: auto !important;
+        height: 4px;
+    }
+}
+
+#divider {
+    width: 4px;
+    background-color: #444444;
+}

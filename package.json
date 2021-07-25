@@ -3,20 +3,19 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/index.js",
-  "dependencies": {
-    "monaco-editor": "0.25.2",
-    "wasmoon": "1.8.2"
-  },
   "devDependencies": {
-    "copy-webpack-plugin": "9.0.0",
-    "css-loader": "5.2.6",
+    "copy-webpack-plugin": "9.0.1",
+    "css-loader": "6.2.0",
     "file-loader": "6.2.0",
-    "html-webpack-plugin": "5.3.1",
-    "monaco-editor-webpack-plugin": "4.0.0",
+    "html-webpack-plugin": "5.3.2",
+    "monaco-editor": "0.26.1",
+    "monaco-editor-webpack-plugin": "4.1.1",
     "raw-loader": "4.0.2",
-    "style-loader": "2.0.0",
-    "webpack": "5.39.1",
-    "webpack-cli": "4.7.2"
+    "style-loader": "3.2.1",
+    "wasmoon": "1.11.0",
+    "webpack": "5.46.0",
+    "webpack-cli": "4.7.2",
+    "workbox-webpack-plugin": "^6.1.5"
   },
   "scripts": {
     "start": "webpack --mode=development --watch --progress",

@@ -54,6 +54,10 @@ main {
         width: auto !important;
         height: 4px;
     }
+
+    .tip {
+        display: none;
+    }
 }
 
 #divider {

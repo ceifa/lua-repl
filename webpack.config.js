@@ -32,12 +32,17 @@ const config = {
             },
             {
                 type: 'javascript/auto',
-                test: /\.(ttf|wasm|woff|woff2)$/,
+                test: /\.(ttf|wasm)$/,
                 use: ['file-loader']
             }, {
                 test: /\.lua$/,
                 use: ['raw-loader']
-            }]
+            },
+            {
+                scheme: 'data',
+                type: 'asset',
+            }
+        ]
     },
     plugins: [
         new MonacoWebpackPlugin({
@@ -53,8 +58,7 @@ const config = {
         }),
     ],
     experiments: {
-        asyncWebAssembly: true,
-        syncWebAssembly: true
+        asyncWebAssembly: true
     }
 };
 

@@ -1,80 +1,77 @@
-import './assets/CascadiaMono.ttf';
-
 import { editor, KeyMod, KeyCode } from 'monaco-editor';
-import wasmFile from 'wasmoon/dist/glue.wasm'
-import { decorateFunction, LuaFactory } from 'wasmoon';
-import defaultScript from './default.lua'
+import defaultScript from './default.lua';
+
+const monacoEditor = editor.create(document.getElementById('editor'), {
+    language: 'lua',
+    theme: 'vs-dark',
+    automaticLayout: true,
+    fontLigatures: true,
+    fontFamily: 'Cascadia Code'
+});
 
 (async () => {
-    let startScript = defaultScript
-
     if (window.pasteFetch) {
         try {
             const res = await window.pasteFetch;
             if (res.ok) {
-                startScript = await res.text();
+                monacoEditor.setValue(await res.text())
             }
         } catch (err) {
             console.error(err);
         }
     }
 
-    const monacoEditor = editor.create(document.getElementById('editor'), {
-        value: startScript,
-        language: 'lua',
-        theme: 'vs-dark',
-        automaticLayout: true,
-        fontLigatures: true,
-        fontFamily: 'Cascadia Code',
-    });
+    if (!monacoEditor.getValue()) {
+        monacoEditor.setValue(defaultScript);
+    }
 
-    const output = document.getElementById('output');
+    const outputEl = document.getElementById('output');
 
-    const factory = new LuaFactory(wasmFile);
-
-    const executeLuaCode = async () => {
-        console.clear();
-        output.innerHTML = '';
-
-        const addLog = (str) => {
-            const log = document.createElement('span');
-            log.innerText = str;
-            output.appendChild(log);
-            output.appendChild(document.createElement('br'));
+    let runner, isRunning = false;
+    const getRunner = () => {
+        if (runner && isRunning) {
+            runner.terminate();
+            runner = undefined;
         }
 
-        const state = await factory.createEngine();
-        try {
-            state.global.set('print', decorateFunction((thread, argsQuantity) => {
-                const values = [];
-                for (let i = 1; i <= argsQuantity; i++) {
-                    values.push(thread.indexToString(i));
-                }
+        if (!runner) {
+            runner = new Worker(new URL('./runner.js', import.meta.url));
+        }
 
-                console.log(...values);
-                addLog(values.join('\t'));
-            }, {
-                receiveArgsQuantity: true,
-                receiveThread: true
-            }));
-            const result = await state.doString(monacoEditor.getValue());
-            if (result) {
-                addLog(result);
+        isRunning = true;
+
+        runner.onmessage = ({ data: log }) => {
+            if (typeof log === 'object') {
+                outputEl.style.color = '#FFFFFF';
+                isRunning = false;
+                return;
             }
-        } catch (err) {
-            addLog(err.toString());
-        } finally {
-            state.global.close();
-        }
+
+            document.getElementById('running')?.remove();
+
+            const logEl = document.createElement('span');
+            logEl.innerText = log;
+            outputEl.appendChild(logEl);
+            outputEl.appendChild(document.createElement('br'));
+        };
+
+        return runner;
     };
 
-    await executeLuaCode();
+    const runLua = async () => {
+        outputEl.style.color = '#888888';
+        outputEl.innerHTML = '<span id="running">Running...</span>';
+
+        getRunner().postMessage(monacoEditor.getValue())
+    };
+
+    await runLua();
 
     monacoEditor.addAction({
         id: 'execute-action',
         label: 'Execute code',
         keybindings: [KeyMod.CtrlCmd | KeyCode.KEY_E],
-        run: executeLuaCode
+        run: runLua
     });
 
     monacoEditor.addAction({

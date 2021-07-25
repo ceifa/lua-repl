@@ -19,12 +19,6 @@ const config = {
         }
     },
     module: {
-        defaultRules: [
-            {
-                type: 'javascript/auto',
-                resolve: {}
-            }
-        ],
         rules: [
             {
                 test: /\.css$/,
@@ -34,7 +28,8 @@ const config = {
                 type: 'javascript/auto',
                 test: /\.(ttf|wasm)$/,
                 use: ['file-loader']
-            }, {
+            },
+            {
                 test: /\.lua$/,
                 use: ['raw-loader']
             },

@@ -41,13 +41,15 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
         isRunning = true;
 
         runner.onmessage = ({ data: log }) => {
+            if (document.getElementById('running')) {
+                document.getElementById('running').remove()
+            }
+
             if (typeof log === 'object') {
                 outputEl.style.color = '#FFFFFF';
                 isRunning = false;
                 return;
             }
-
-            document.getElementById('running')?.remove();
 
             const logEl = document.createElement('span');
             logEl.innerText = log;

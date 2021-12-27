@@ -30,6 +30,11 @@ main {
     flex-direction: column;
 }
 
+#current-action {
+    color: #888888;
+    margin-bottom: 1rem;
+}
+
 #output {
     flex: 1;
     background-color: rgb(13, 16, 30);

@@ -27,7 +27,12 @@ const config = {
             {
                 type: 'javascript/auto',
                 test: /\.(ttf|wasm)$/,
-                use: ['file-loader']
+                use: [{
+                    loader: 'file-loader',
+                    options: {
+                        esModule: false
+                    }
+                }],
             },
             {
                 test: /\.lua$/,

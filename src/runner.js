@@ -3,10 +3,6 @@ import { decorateFunction, LuaFactory } from 'wasmoon';
 
 const factory = new LuaFactory(wasmFile);
 
-const sendLog = log => {
-    self.postMessage(log)
-};
-
 const execute = async (luaCode) => {
     console.clear();
 
@@ -19,23 +15,29 @@ const execute = async (luaCode) => {
             }
 
             console.log(...values);
-            sendLog(values.join('\t'));
+            self.postMessage({ type: 'log', data: values.join('\t') });
         }, {
             receiveArgsQuantity: true,
             receiveThread: true
         }));
+
+        state.global.set('clear', () => {
+            self.postMessage({ type: 'clear' });
+            console.clear()
+        });
+
         // Sync is faster
         // We are inside a web worker, should not worry about blocking the main thread
         const result = state.doStringSync(luaCode);
         if (result) {
-            sendLog(result);
+            self.postMessage({ type: 'log', data: result });
         }
     } catch (err) {
-        sendLog(err.toString());
+        self.postMessage({ type: 'error', data: err.toString() });
         console.error(err);
     } finally {
         state.global.close();
-        self.postMessage({})
+        self.postMessage({ type: 'finished' });
     }
 };
 

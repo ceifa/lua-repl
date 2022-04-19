@@ -2,12 +2,22 @@ html {
     overflow: hidden;
 }
 
+html, body {
+    margin: 0;
+}
+
 main {
     font-family: "Cascadia Code";
     display: flex;
     align-items: stretch;
     height: 100vh;
     width: 100%;
+}
+
+pre {
+    font-family: "Cascadia Code";
+    margin: 0;
+    padding: 0;
 }
 
 @media (max-width: 1000px) {

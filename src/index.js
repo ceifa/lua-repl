@@ -40,19 +40,24 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
 
         isRunning = true
 
-        runner.onmessage = ({ data: log }) => {
+        runner.onmessage = ({ data: { type, data } }) => {
             document.getElementById('running')?.remove()
 
-            if (typeof log === 'object') {
+            if (type === 'finished') {
                 outputEl.style.color = '#FFFFFF'
                 isRunning = false
-                return
+            } else if (type === 'log') {
+                const logEl = document.createElement('pre')
+                logEl.innerText = data
+                outputEl.appendChild(logEl)
+            } else if (type === 'error') {
+                const logEl = document.createElement('span')
+                logEl.innerText = data
+                logEl.style.color = '#FF0000'
+                outputEl.appendChild(logEl)
+            } else if (type === 'clear') {
+                outputEl.innerHTML = ''
             }
-
-            const logEl = document.createElement('span')
-            logEl.innerText = log
-            outputEl.appendChild(logEl)
-            outputEl.appendChild(document.createElement('br'))
         }
 
         return runner
@@ -72,6 +77,20 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
         label: 'Execute code',
         keybindings: [KeyMod.CtrlCmd | KeyCode.KeyE],
         run: runLua
+    })
+
+    monacoEditor.addAction({
+        id: 'stop-action',
+        label: 'Stop running code',
+        keybindings: [KeyMod.CtrlCmd | KeyCode.KeyM],
+        run: () => {
+            if (runner && isRunning) {
+                runner.terminate()
+                runner = undefined
+                outputEl.style.color = '#FFFFFF'
+                isRunning = false
+            }
+        }
     })
 
     monacoEditor.addAction({

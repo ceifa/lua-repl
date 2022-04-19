@@ -25,22 +25,12 @@ const config = {
                 use: ['style-loader', 'css-loader']
             },
             {
-                type: 'javascript/auto',
                 test: /\.(ttf|wasm)$/,
-                use: [{
-                    loader: 'file-loader',
-                    options: {
-                        esModule: false
-                    }
-                }],
+                type: 'asset/resource',
             },
             {
                 test: /\.lua$/,
-                use: ['raw-loader']
-            },
-            {
-                scheme: 'data',
-                type: 'asset',
+                type: 'asset/source'
             }
         ]
     },

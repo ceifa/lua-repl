@@ -1,7 +1,7 @@
-<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="UTF-8"><link rel="icon" type="image/png" href="./assets/logo.png"/><title>Lua Repl</title><link rel="preload" href="/assets/CascadiaMono.ttf" as="font" type="font/ttf" crossorigin><style>@font-face {
+<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="UTF-8"><meta name="description" content="Try Lua online"><link rel="icon" type="image/png" href="./assets/logo.png"/><title>Lua Repl</title><link rel="preload" href="/assets/CascadiaMono.ttf" as="font" type="font/ttf" crossorigin><style>@font-face {
             font-family: 'Cascadia Code';
             src: url(assets/CascadiaMono.ttf);
         }</style><script>const paste = new URLSearchParams(window.location.search).get('paste');
         if (paste) {
-            window.pasteFetch = fetch('https://api.ceifa.tv/document/' + paste)
+            window.pasteFetch = fetch('https://api.ceifa.dev/document/' + paste)
         }</script><script defer="defer" src="app.js"></script></head><body><main><div id="editor"><div class="tip"><span id="current-action"></span> <span>Ctrl + E to execute</span> <span>Ctrl + S to save</span></div></div><div id="divider"></div><div id="output"></div><div class="github"><a href="https://github.com/ceifa/try-lua">Made with ❤️</a></div></main><link rel="stylesheet" href="./assets/index.css"></body></html>

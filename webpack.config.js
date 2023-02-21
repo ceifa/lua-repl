@@ -3,6 +3,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
+/** @type {import('webpack').Configuration} */
 const config = {
     entry: './src/index.js',
     output: {
@@ -15,7 +16,8 @@ const config = {
             fs: false,
             child_process: false,
             crypto: false,
-            url: false
+            url: false,
+            module: false
         }
     },
     module: {

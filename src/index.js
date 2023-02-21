@@ -28,14 +28,15 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
     const outputEl = document.getElementById('output')
 
     let runner, isRunning = false
-    const getRunner = () => {
+    const createRunner = () => {
         if (runner && isRunning) {
             runner.terminate()
             runner = undefined
         }
 
         if (!runner) {
-            runner = new Worker(new URL('./runner.js', import.meta.url))
+            runner = new Worker(new URL('./runner.js', import.meta.url),
+                { name: 'Lua runner' })
         }
 
         isRunning = true
@@ -67,7 +68,10 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
         outputEl.style.color = '#888888'
         outputEl.innerHTML = '<span id="running">Running...</span>'
 
-        getRunner().postMessage(monacoEditor.getValue())
+        createRunner().postMessage({
+            type: 'execute',
+            data: monacoEditor.getValue()
+        })
     }
 
     await runLua()
@@ -101,11 +105,11 @@ const monacoEditor = editor.create(document.getElementById('editor'), {
             try {
                 document.getElementById('current-action').innerText = 'Saving...'
 
-                const res = await fetch('https://api.ceifa.tv/documents', {
+                const res = await fetch('https://api.ceifa.dev/documents', {
                     method: 'POST',
                     body: monacoEditor.getValue()
                 })
-    
+
                 if (res.ok) {
                     const body = await res.json()
                     history.pushState(body, document.title, `?paste=${body.key}`)

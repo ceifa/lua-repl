@@ -4,6 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
+    <meta name="description" content="Try Lua online">
     <link rel="icon" type="image/png" href="./assets/logo.png" />
     <title>Lua Repl</title>
     <link rel="preload" href="/assets/CascadiaMono.ttf" as="font" type="font/ttf" crossorigin>
@@ -16,7 +17,7 @@
     <script>
         const paste = new URLSearchParams(window.location.search).get('paste');
         if (paste) {
-            window.pasteFetch = fetch('https://api.ceifa.tv/document/' + paste)
+            window.pasteFetch = fetch('https://api.ceifa.dev/document/' + paste)
         }
     </script>
 </head>

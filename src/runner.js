@@ -41,4 +41,8 @@ const execute = async (luaCode) => {
     }
 };
 
-self.onmessage = ({ data }) => execute(data);
+self.onmessage = ({ data: { type, data } }) => {
+    if (type === 'execute') {
+        execute(data);
+    }
+}

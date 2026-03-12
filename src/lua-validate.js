@@ -2,17 +2,11 @@ import wasmFile from 'wasmoon/dist/glue.wasm?url'
 import { LuaFactory } from 'wasmoon'
 import { registerRuntimeHelpers } from './lua-runtime'
 
-let browserFactory
-let nodeFactory
+let factory
 
-const createFactory = customWasmFile => {
-    if (customWasmFile) {
-        browserFactory ||= new LuaFactory(customWasmFile)
-        return browserFactory
-    }
-
-    nodeFactory ||= new LuaFactory()
-    return nodeFactory
+const createFactory = () => {
+    factory ||= new LuaFactory(wasmFile)
+    return factory
 }
 
 const clampLine = (line, totalLines) => Math.min(Math.max(line, 1), Math.max(totalLines, 1))
@@ -59,7 +53,7 @@ const parseRuntimeError = (source, message) => {
 }
 
 export const validateLuaSource = async (source, options = {}) => {
-    const factory = createFactory(options.wasmFile || (typeof window !== 'undefined' ? wasmFile : undefined))
+    const factory = createFactory()
     const state = await factory.createEngine()
 
     try {

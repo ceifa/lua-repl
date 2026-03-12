@@ -1,5 +1,6 @@
 import wasmFile from 'wasmoon/dist/glue.wasm?url'
-import { decorateFunction, LuaFactory } from 'wasmoon'
+import { LuaFactory } from 'wasmoon'
+import { registerRuntimeHelpers } from './lua-runtime'
 
 const factory = new LuaFactory(wasmFile)
 
@@ -8,22 +9,15 @@ const execute = async (luaCode) => {
 
     const state = await factory.createEngine()
     try {
-        state.global.set('print', decorateFunction((thread, argsQuantity) => {
-            const values = []
-            for (let i = 1; i <= argsQuantity; i++) {
-                values.push(thread.indexToString(i))
-            }
-
-            console.log(...values)
-            self.postMessage({ type: 'log', data: values.join('\t') })
-        }, {
-            receiveArgsQuantity: true,
-            receiveThread: true
-        }))
-
-        state.global.set('clear', () => {
-            self.postMessage({ type: 'clear' })
-            console.clear()
+        registerRuntimeHelpers(state, {
+            onLog(values) {
+                console.log(...values)
+                self.postMessage({ type: 'log', data: values.join('\t') })
+            },
+            onClear() {
+                self.postMessage({ type: 'clear' })
+                console.clear()
+            },
         })
 
         // Sync is faster

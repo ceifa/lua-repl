@@ -18,6 +18,7 @@ let monacoEditor
 let monacoApi
 let runner
 let isRunning = false
+let luaLanguage
 
 const loadSharedPaste = async () => {
     if (!window.pasteFetch) {
@@ -158,7 +159,7 @@ const loadEditor = async () => {
     ])
 
     monacoApi = monacoModule
-    luaLanguageModule.setUpLuaLanguage()
+    luaLanguage = luaLanguageModule.setUpLuaLanguage()
 
     monacoEditor = monacoApi.editor.create(editorEl, {
         value: defaultScript,
@@ -174,6 +175,7 @@ const loadEditor = async () => {
     })
 
     setEditorActions()
+    luaLanguage.attachToEditor(monacoEditor)
     editorEl.dataset.ready = 'true'
 
     applySharedPaste().catch(err => {

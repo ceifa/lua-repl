@@ -1,17 +1,38 @@
 import 'monaco-editor/esm/vs/basic-languages/lua/lua.contribution.js'
-import { languages, editor } from 'monaco-editor/esm/vs/editor/editor.api.js'
-import globals from './globals.json'
+import { languages, editor, MarkerSeverity } from 'monaco-editor/esm/vs/editor/editor.api.js'
+import luaServiceWorker from './lua-service.worker?worker'
+import {
+    mergeDiagnostics,
+    mergeSyntaxDiagnostics,
+    shouldApplyResponse,
+} from './lua-service-client'
 
-let lastGoodAst = null
-let luaparsePromise
 let luaFmtPromise
+let languageSetup
 
-const loadLuaparse = async () => {
-    if (!luaparsePromise) {
-        luaparsePromise = import('luaparse').then(module => module.parse)
+const MARKER_OWNER = 'lua-intelligence'
+const ANALYZE_DELAY_MS = 120
+const VALIDATE_DELAY_MS = 350
+
+const runWhenIdle = (task, timeout = 1200) => {
+    if ('requestIdleCallback' in window) {
+        return window.requestIdleCallback(task, { timeout })
     }
 
-    return luaparsePromise
+    return window.setTimeout(task, 1)
+}
+
+const cancelIdleTask = handle => {
+    if (!handle) {
+        return
+    }
+
+    if ('cancelIdleCallback' in window) {
+        window.cancelIdleCallback(handle)
+        return
+    }
+
+    window.clearTimeout(handle)
 }
 
 const loadLuaFormatter = async () => {
@@ -22,500 +43,319 @@ const loadLuaFormatter = async () => {
     return luaFmtPromise
 }
 
-export const setUpLuaLanguage = () => {
-    languages.registerDocumentFormattingEditProvider('lua', {
-        displayName: 'Lua formatter',
-        async provideDocumentFormattingEdits(model, options, token) {
-            let code = model.getValue()
-            try {
-                const formatText = await loadLuaFormatter()
-                return [
-                    {
-                        eol: editor.EndOfLineSequence.LF,
-                        range: model.getFullModelRange(),
-                        text: formatText(code, {
-                            useTabs: !options.insertSpaces,
-                            indentCount: options.tabSize,
-                            quotemark: 'double',
-                        }),
-                    },
-                ]
-            } catch {
-                return []
-            }
-        },
-    })
+const completionKindMap = {
+    constant: languages.CompletionItemKind.Constant,
+    field: languages.CompletionItemKind.Field,
+    function: languages.CompletionItemKind.Function,
+    keyword: languages.CompletionItemKind.Keyword,
+    method: languages.CompletionItemKind.Method,
+    parameter: languages.CompletionItemKind.Variable,
+    snippet: languages.CompletionItemKind.Snippet,
+    string: languages.CompletionItemKind.Text,
+    table: languages.CompletionItemKind.Module,
+    variable: languages.CompletionItemKind.Variable,
+}
 
-    languages.registerCompletionItemProvider('lua', {
-        triggerCharacters: ['.'],
-        async provideCompletionItems(model, position) {
-            const lineContent = model.getLineContent(position.lineNumber)
-            const textBeforeCursor = lineContent.substring(0, position.column - 1)
-            const singleQuotes = (textBeforeCursor.match(/'/g) || []).length
-            const doubleQuotes = (textBeforeCursor.match(/"/g) || []).length
-            const insideString = singleQuotes % 2 === 1 || doubleQuotes % 2 === 1
-            if (insideString) {
-                return { suggestions: [] }
+const toMarkerSeverity = severity => {
+    switch (severity) {
+        case 'error':
+            return MarkerSeverity.Error
+        case 'warning':
+            return MarkerSeverity.Warning
+        default:
+            return MarkerSeverity.Info
+    }
+}
+
+class LuaLanguageService {
+    constructor() {
+        this.worker = new luaServiceWorker({ name: 'Lua analysis worker', type: 'module' })
+        this.pending = new Map()
+        this.nextRequestId = 0
+        this.modelStates = new Map()
+
+        this.worker.onmessage = ({ data }) => {
+            const pending = this.pending.get(data.id)
+            if (!pending) {
+                return
             }
 
-            const suggestions = []
-            const word = model.getWordUntilPosition(position)
-            const range = {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: word.startColumn,
-                endColumn: word.endColumn,
+            this.pending.delete(data.id)
+            pending.resolve(data.response)
+        }
+
+        this.worker.onerror = error => {
+            for (const pending of this.pending.values()) {
+                pending.reject(error)
             }
-            const textUntilPosition = model.getValueInRange({
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: 1,
-                endColumn: position.column,
+
+            this.pending.clear()
+        }
+    }
+
+    dispose() {
+        this.worker.terminate()
+        this.pending.clear()
+    }
+
+    callWorker(type, request) {
+        const id = ++this.nextRequestId
+
+        return new Promise((resolve, reject) => {
+            this.pending.set(id, { resolve, reject })
+            this.worker.postMessage({ id, type, request })
+        })
+    }
+
+    ensureModelState(model) {
+        const uri = model.uri.toString()
+        if (!this.modelStates.has(uri)) {
+            this.modelStates.set(uri, {
+                model,
+                latestVersion: model.getVersionId(),
+                analysisDiagnostics: [],
+                runtimeDiagnostics: [],
+                validationStatus: 'idle',
+                analyzeTimer: undefined,
+                validateTimer: undefined,
+                idleHandle: undefined,
             })
-            const dotMatch = textUntilPosition.match(/([\w_\.]+)\.$/)
-            const dotChain = dotMatch ? dotMatch[1].split('.') : []
+        }
 
-            if (!dotMatch || dotChain.length === 0 || dotChain[0] === '_G') {
-                let registeredNames = new Set()
-                for (const fullFn of globals.functions) {
-                    const name = fullFn.split('.')[0]
-                    if (registeredNames.has(name)) continue
-                    suggestions.push({
-                        label: name,
-                        kind: languages.CompletionItemKind.Function,
-                        insertText: name,
-                        range,
-                        sortText: `3${name}`,
-                    })
-                    registeredNames.add(name)
-                }
-            } else if (dotChain.length === 1) {
-                const tableName = dotChain[0]
-                const matchedFunctions = globals.functions.filter(fn => fn.startsWith(`${tableName}.`))
-                matchedFunctions.forEach(fullFn => {
-                    const shortFnName = fullFn.replace(`${tableName}.`, '')
-                    suggestions.push({
-                        label: shortFnName,
-                        kind: languages.CompletionItemKind.Function,
-                        insertText: shortFnName,
-                        range,
-                        sortText: `1${shortFnName}`,
-                    })
-                })
-            }
+        return this.modelStates.get(uri)
+    }
 
-            if (!dotMatch || dotChain.length === 0 || dotChain[0] === '_G') {
-                suggestions.push(
-                    {
-                        label: '_G',
-                        kind: languages.CompletionItemKind.Variable,
-                        insertText: '_G',
-                        range,
-                        sortText: `3_G`,
-                    },
-                    {
-                        label: '_VERSION',
-                        kind: languages.CompletionItemKind.Constant,
-                        insertText: '_VERSION',
-                        range,
-                        sortText: `3_VERSION`,
-                    }
-                )
+    clearModelState(uri) {
+        const state = this.modelStates.get(uri)
+        if (!state) {
+            return
+        }
+
+        window.clearTimeout(state.analyzeTimer)
+        window.clearTimeout(state.validateTimer)
+        cancelIdleTask(state.idleHandle)
+        this.modelStates.delete(uri)
+    }
+
+    updateMarkers(model, state) {
+        const diagnostics =
+            state.validationStatus === 'failed'
+                ? mergeSyntaxDiagnostics(state.analysisDiagnostics, state.runtimeDiagnostics)
+                : state.validationStatus === 'passed'
+                    ? state.analysisDiagnostics.filter(diagnostic => diagnostic.code !== 'syntax')
+                    : mergeDiagnostics(state.analysisDiagnostics, state.runtimeDiagnostics)
+
+        editor.setModelMarkers(
+            model,
+            MARKER_OWNER,
+            diagnostics.map(diagnostic => ({
+                ...diagnostic,
+                severity: toMarkerSeverity(diagnostic.severity),
+            }))
+        )
+    }
+
+    scheduleAnalysis(model) {
+        const state = this.ensureModelState(model)
+        state.latestVersion = model.getVersionId()
+        state.validationStatus = 'pending'
+        state.runtimeDiagnostics = []
+
+        window.clearTimeout(state.analyzeTimer)
+        state.analyzeTimer = window.setTimeout(() => {
+            const request = {
+                uri: model.uri.toString(),
+                version: model.getVersionId(),
+                source: model.getValue(),
             }
 
-            if (!dotMatch) {
-                suggestions.push(
-                    {
-                        label: 'if',
-                        kind: languages.CompletionItemKind.Snippet,
-                        insertText: 'if ${1:condition} then\n\t$0\nend',
-                        insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                        range,
-                    },
-                    {
-                        label: 'for',
-                        kind: languages.CompletionItemKind.Snippet,
-                        insertText: 'for ${1:i} = ${2:1}, ${3:10} do\n\t$0\nend',
-                        insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                        range,
-                    },
-                    {
-                        label: 'function',
-                        kind: languages.CompletionItemKind.Snippet,
-                        insertText: 'function ${1:functionName}(${2:args})\n\t$0\nend',
-                        insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                        range,
-                    },
-                    {
-                        label: 'local',
-                        kind: languages.CompletionItemKind.Snippet,
-                        insertText: 'local ${1:var} = ${2:value}',
-                        insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                        range,
-                    }
-                )
-            }
-
-            let code = model.getValue()
-            if (dotMatch) {
-                const invalidCode = dotMatch[0]
-                code =
-                    code.slice(0, model.getOffsetAt(position) - invalidCode.length) +
-                    code.slice(model.getOffsetAt(position))
-            }
-
-            let ast
-            try {
-                const parse = await loadLuaparse()
-                ast = parse(code, { locations: true, scope: true })
-                lastGoodAst = ast
-            } catch {
-                if (!lastGoodAst) {
-                    return { suggestions }
-                }
-                ast = lastGoodAst
-            }
-
-            const cursorPos = { line: position.lineNumber, column: position.column }
-            function posLessOrEqual(a, b) {
-                if (a.line < b.line) return true
-                return a.line === b.line && a.column <= b.column
-            }
-            function posWithin(startPos, endPos, cur) {
-                return posLessOrEqual(startPos, cur) && posLessOrEqual(cur, endPos)
-            }
-            function makePos(locSide) {
-                return { line: locSide.line, column: locSide.column }
-            }
-
-            function createScope(startPos, endPos, parentScope) {
-                return {
-                    startPos,
-                    endPos,
-                    localDecls: [],
-                    children: [],
-                    parent: parentScope || null,
-                }
-            }
-            function addChildScope(parent, child) {
-                parent.children.push(child)
-            }
-
-            const rootStartPos = ast.loc?.start ? makePos(ast.loc.start) : { line: 1, column: 0 }
-            const totalLines = model.getLineCount()
-            const lastLineLen = model.getLineMaxColumn(totalLines)
-            let rootEndPos
-            if (ast.loc?.end) {
-                const astEnd = makePos(ast.loc.end)
-                if (
-                    astEnd.line < totalLines ||
-                    (astEnd.line === totalLines && astEnd.column < lastLineLen)
-                ) {
-                    rootEndPos = { line: totalLines, column: lastLineLen }
-                } else {
-                    rootEndPos = astEnd
-                }
-            } else {
-                rootEndPos = { line: totalLines, column: lastLineLen }
-            }
-            const rootScope = createScope(rootStartPos, rootEndPos, null)
-            let currentScope = rootScope
-
-            const globalVars = new Map()
-
-            function pushScope(node) {
-                const newScope = createScope(
-                    makePos(node.loc.start),
-                    makePos(node.loc.end),
-                    currentScope
-                )
-                addChildScope(currentScope, newScope)
-                currentScope = newScope
-            }
-            function popScope() {
-                if (currentScope.parent) {
-                    currentScope = currentScope.parent
-                }
-            }
-
-            function parseTableConstructor(tableExpr) {
-                const tableObj = {}
-                if (!tableExpr.fields) return tableObj
-
-                for (let field of tableExpr.fields) {
-                    if (field.type === 'TableKeyString' && field.key.type === 'Identifier') {
-                        const fieldName = field.key.name
-                        if (field.value.type === 'TableConstructorExpression') {
-                            tableObj[fieldName] = parseTableConstructor(field.value)
-                        } else {
-                            tableObj[fieldName] =
-                                field.value.type === 'FunctionDeclaration'
-                                    ? languages.CompletionItemKind.Function
-                                    : languages.CompletionItemKind.Field
-                        }
-                    }
-                }
-                return tableObj
-            }
-
-            function attachTableToVar(scope, varName, tableObj) {
-                let s = scope
-                while (s) {
-                    let decl = s.localDecls.find(d => d.name === varName)
-                    if (decl) {
-                        decl.tableFields = tableObj
+            this.callWorker('analyze', request)
+                .then(response => {
+                    if (!shouldApplyResponse(model.getVersionId(), response.version)) {
                         return
                     }
-                    s = s.parent
-                }
-            }
 
-            function traverse(node) {
-                if (!node || typeof node !== 'object') return
-
-                const blockTypes = [
-                    'FunctionDeclaration',
-                    'ForNumericStatement',
-                    'ForGenericStatement',
-                    'DoStatement',
-                    'WhileStatement',
-                    'RepeatStatement',
-                    'IfClause',
-                    'ElseifClause',
-                    'ElseClause',
-                ]
-
-                if (blockTypes.includes(node.type)) {
-                    pushScope(node)
-                }
-
-                if (node.type === 'LocalStatement' && Array.isArray(node.variables)) {
-                    node.variables.forEach((variable, idx) => {
-                        if (variable.type === 'Identifier') {
-                            const localObj = {
-                                name: variable.name,
-                                declPos: makePos(node.loc.start),
-                                type: languages.CompletionItemKind.Variable,
-                            }
-                            currentScope.localDecls.push(localObj)
-
-                            if (
-                                node.init &&
-                                node.init[idx] &&
-                                node.init[idx].type === 'TableConstructorExpression'
-                            ) {
-                                localObj.tableFields = parseTableConstructor(node.init[idx])
-                            }
-                        }
-                    })
-                }
-
-                if (node.type === 'ForNumericStatement' && node.variable.type === 'Identifier') {
-                    currentScope.localDecls.push({
-                        name: node.variable.name,
-                        declPos: makePos(node.loc.start),
-                        type: languages.CompletionItemKind.Variable,
-                    })
-                }
-
-                if (node.type === 'ForGenericStatement' && Array.isArray(node.variables)) {
-                    node.variables.forEach(v => {
-                        if (v.type === 'Identifier') {
-                            currentScope.localDecls.push({
-                                name: v.name,
-                                declPos: makePos(node.loc.start),
-                                type: languages.CompletionItemKind.Variable,
-                            })
-                        }
-                    })
-                }
-
-                if (node.type === 'FunctionDeclaration') {
-                    if (node.identifier && node.identifier.type === 'Identifier') {
-                        if (node.isLocal) {
-                            currentScope.parent.localDecls.push({
-                                name: node.identifier.name,
-                                declPos: makePos(node.loc.start),
-                                type: languages.CompletionItemKind.Function,
-                            })
-                        } else {
-                            const name = node.identifier.name
-                            if (!globalVars.has(name)) {
-                                globalVars.set(name, { tableFields: null })
-                            }
-                        }
-                    }
-                    if (Array.isArray(node.parameters)) {
-                        node.parameters.forEach(param => {
-                            if (param.type === 'Identifier') {
-                                currentScope.localDecls.push({
-                                    name: param.name,
-                                    declPos: makePos(node.loc.start),
-                                    type: languages.CompletionItemKind.Variable,
-                                })
-                            }
-                        })
-                    }
-                }
-
-                if (node.type === 'AssignmentStatement' && Array.isArray(node.variables)) {
-                    node.variables.forEach((v, idx) => {
-                        if (v.type === 'Identifier') {
-                            const name = v.name
-                            let s = currentScope
-                            let foundLocal = false
-                            while (s) {
-                                if (s.localDecls.some(decl => decl.name === name)) {
-                                    foundLocal = true
-                                    break
-                                }
-                                s = s.parent
-                            }
-
-                            if (!foundLocal) {
-                                if (!globalVars.has(name)) {
-                                    globalVars.set(name, { tableFields: null })
-                                }
-
-                                if (
-                                    node.init &&
-                                    node.init[idx] &&
-                                    node.init[idx].type === 'TableConstructorExpression'
-                                ) {
-                                    const tableObj = parseTableConstructor(node.init[idx])
-                                    globalVars.set(name, { tableFields: tableObj })
-                                } else {
-                                    globalVars.set(name, { tableFields: null })
-                                }
-                            } else {
-                                if (
-                                    node.init &&
-                                    node.init[idx] &&
-                                    node.init[idx].type === 'TableConstructorExpression'
-                                ) {
-                                    const tableObj = parseTableConstructor(node.init[idx])
-                                    attachTableToVar(currentScope, name, tableObj)
-                                }
-                            }
-                        }
-                    })
-                }
-
-                ;['body', 'clauses', 'elseBody'].forEach(prop => {
-                    const val = node[prop]
-                    if (Array.isArray(val)) {
-                        val.forEach(c => traverse(c))
-                    } else if (val && typeof val === 'object') {
-                        traverse(val)
-                    }
+                    state.analysisDiagnostics = response.diagnostics
+                    this.updateMarkers(model, state)
                 })
-
-                if (blockTypes.includes(node.type)) {
-                    popScope()
-                }
-            }
-
-            traverse(ast)
-
-            function getScopesForCursor(scope, curPos, found = []) {
-                if (!scope) return found
-                if (posWithin(scope.startPos, scope.endPos, curPos)) {
-                    found.push(scope)
-                    scope.children.forEach(child => {
-                        getScopesForCursor(child, curPos, found)
-                    })
-                }
-                return found
-            }
-            const scopesUnderCursor = getScopesForCursor(rootScope, cursorPos)
-
-            const localVars = new Map()
-            function collectLocals(scope) {
-                scope.localDecls.forEach(decl => {
-                    if (posLessOrEqual(decl.declPos, cursorPos)) {
-                        if (!localVars.has(decl.name)) {
-                            localVars.set(decl.name, decl)
-                        }
-                    }
+                .catch(error => {
+                    console.error(error)
                 })
-                if (scope.parent) {
-                    collectLocals(scope.parent)
+        }, ANALYZE_DELAY_MS)
+    }
+
+    scheduleValidation(model) {
+        const state = this.ensureModelState(model)
+
+        window.clearTimeout(state.validateTimer)
+        cancelIdleTask(state.idleHandle)
+
+        state.validateTimer = window.setTimeout(() => {
+            state.idleHandle = runWhenIdle(() => {
+                const request = {
+                    uri: model.uri.toString(),
+                    version: model.getVersionId(),
+                    source: model.getValue(),
                 }
-            }
-            scopesUnderCursor.forEach(s => {
-                collectLocals(s)
+
+                this.callWorker('validate', request)
+                    .then(response => {
+                        if (!shouldApplyResponse(model.getVersionId(), response.version)) {
+                            return
+                        }
+
+                        state.runtimeDiagnostics = response.diagnostics
+                        state.validationStatus = response.diagnostics.length > 0 ? 'failed' : 'passed'
+                        this.updateMarkers(model, state)
+                    })
+                    .catch(error => {
+                        console.error(error)
+                    })
             })
+        }, VALIDATE_DELAY_MS)
+    }
 
-            if (!dotMatch) {
-                localVars.forEach((decl, name) => {
-                    suggestions.push({
-                        label: name,
-                        kind: languages.CompletionItemKind.Variable,
-                        insertText: name,
-                        range,
-                        sortText: `2${name}`,
-                    })
-                })
+    async provideCompletionItems(model, position) {
+        const suggestions = await this.callWorker('complete', {
+            uri: model.uri.toString(),
+            version: model.getVersionId(),
+            source: model.getValue(),
+            position,
+        })
+
+        if (!shouldApplyResponse(model.getVersionId(), suggestions.version)) {
+            return { suggestions: [] }
+        }
+
+        const word = model.getWordUntilPosition(position)
+        const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+        }
+
+        return {
+            suggestions: suggestions.suggestions.map(item => ({
+                label: item.label,
+                kind: completionKindMap[item.kind] || languages.CompletionItemKind.Variable,
+                insertText: item.insertText,
+                detail: item.detail,
+                documentation: item.documentation,
+                range,
+                sortText: item.sortText,
+                insertTextRules:
+                    item.insertTextRules === 'snippet'
+                        ? languages.CompletionItemInsertTextRule.InsertAsSnippet
+                        : undefined,
+            })),
+        }
+    }
+
+    attachToEditor(editorInstance) {
+        const disposables = []
+        const scheduleCurrentModel = () => {
+            const model = editorInstance.getModel()
+            if (!model) {
+                return
             }
 
-            if (!dotMatch || dotChain.length === 0 || dotChain[0] === '_G') {
-                for (const [name] of globalVars) {
-                    suggestions.push({
-                        label: name,
-                        kind: languages.CompletionItemKind.Variable,
-                        insertText: name,
-                        range,
-                        sortText: `2${name}`,
-                    })
-                }
-            }
+            this.ensureModelState(model)
+            this.scheduleAnalysis(model)
+            this.scheduleValidation(model)
+        }
 
-            if (dotChain.length > 0) {
-                let currentObj = null
-                const firstPiece = dotChain[0]
+        disposables.push(
+            editorInstance.onDidChangeModelContent(() => {
+                scheduleCurrentModel()
+            })
+        )
 
-                if (localVars.has(firstPiece)) {
-                    currentObj = localVars.get(firstPiece)
-                } else if (globalVars.has(firstPiece)) {
-                    currentObj = globalVars.get(firstPiece)
-                }
-
-                for (let i = 1; i < dotChain.length; i++) {
-                    if (!currentObj || !currentObj.tableFields) {
-                        currentObj = null
-                        break
+        disposables.push(
+            editorInstance.onDidChangeModel(event => {
+                if (event.oldModelUrl) {
+                    const oldUri = event.oldModelUrl.toString()
+                    const oldState = this.modelStates.get(oldUri)
+                    if (oldState?.model) {
+                        editor.setModelMarkers(oldState.model, MARKER_OWNER, [])
                     }
-                    const piece = dotChain[i]
-                    if (Object.prototype.hasOwnProperty.call(currentObj.tableFields, piece)) {
-                        const maybeNested = currentObj.tableFields[piece]
-                        if (typeof maybeNested === 'object') {
-                            currentObj = { tableFields: maybeNested }
-                        } else {
-                            currentObj = null
-                            break
-                        }
-                    } else {
-                        currentObj = null
-                        break
-                    }
+                    this.clearModelState(oldUri)
                 }
 
-                if (textUntilPosition.endsWith('.')) {
-                    if (currentObj && currentObj.tableFields) {
-                        Object.entries(currentObj.tableFields).forEach(([fieldName, type]) => {
-                            suggestions.push({
-                                label: fieldName,
-                                kind: typeof type === 'number' ? type : languages.CompletionItemKind.Field,
-                                insertText: fieldName,
-                                range,
-                                sortText: `1${fieldName}`,
-                            })
-                        })
-                    }
-                }
-            }
+                scheduleCurrentModel()
+            })
+        )
 
-            return { suggestions }
+        const currentModel = editorInstance.getModel()
+        if (currentModel) {
+            const disposable = currentModel.onWillDispose(() => {
+                const uri = currentModel.uri.toString()
+                editor.setModelMarkers(currentModel, MARKER_OWNER, [])
+                this.clearModelState(uri)
+            })
+            disposables.push(disposable)
+        }
+
+        scheduleCurrentModel()
+
+        return {
+            dispose: () => {
+                disposables.forEach(disposable => disposable.dispose())
+            },
+        }
+    }
+}
+
+export const setUpLuaLanguage = () => {
+    if (languageSetup) {
+        return languageSetup
+    }
+
+    const service = new LuaLanguageService()
+    const registrations = []
+
+    registrations.push(
+        languages.registerDocumentFormattingEditProvider('lua', {
+            displayName: 'Lua formatter',
+            async provideDocumentFormattingEdits(model, options) {
+                const code = model.getValue()
+                try {
+                    const formatText = await loadLuaFormatter()
+                    return [
+                        {
+                            eol: editor.EndOfLineSequence.LF,
+                            range: model.getFullModelRange(),
+                            text: formatText(code, {
+                                useTabs: !options.insertSpaces,
+                                indentCount: options.tabSize,
+                                quotemark: 'double',
+                            }),
+                        },
+                    ]
+                } catch {
+                    return []
+                }
+            },
+        })
+    )
+
+    registrations.push(
+        languages.registerCompletionItemProvider('lua', {
+            triggerCharacters: ['.', ':'],
+            provideCompletionItems: (model, position) => service.provideCompletionItems(model, position),
+        })
+    )
+
+    languageSetup = {
+        attachToEditor(editorInstance) {
+            return service.attachToEditor(editorInstance)
         },
-    })
+        dispose() {
+            registrations.forEach(registration => registration.dispose())
+            service.dispose()
+            languageSetup = undefined
+        },
+    }
+
+    return languageSetup
 }

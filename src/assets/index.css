@@ -28,6 +28,22 @@ pre {
 
 #editor {
     flex: 1;
+    position: relative;
+}
+
+#editor[data-ready="true"] .editor-loading,
+#editor[data-failed="true"] .editor-loading {
+    display: none;
+}
+
+.editor-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background: rgb(13, 16, 30);
 }
 
 .tip {

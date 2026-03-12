@@ -8,7 +8,8 @@ const config = {
     entry: './src/index.js',
     output: {
         path: path.resolve(__dirname, 'dist'),
-        filename: 'app.js'
+        filename: 'app.js',
+        clean: true,
     },
     resolve: {
         fallback: {
@@ -27,7 +28,7 @@ const config = {
                 use: ['style-loader', 'css-loader']
             },
             {
-                test: /\.(ttf|wasm)$/,
+                test: /\.(woff2|ttf|wasm)$/,
                 type: 'asset/resource',
             },
             {
@@ -38,7 +39,34 @@ const config = {
     },
     plugins: [
         new MonacoWebpackPlugin({
-            languages: ['lua']
+            languages: ['lua'],
+            features: [
+                '!codeAction',
+                '!codelens',
+                '!colorPicker',
+                '!diffEditor',
+                '!diffEditorBreadcrumbs',
+                '!documentSymbols',
+                '!dropOrPasteInto',
+                '!floatingMenu',
+                '!gotoError',
+                '!gotoSymbol',
+                '!inPlaceReplace',
+                '!inlayHints',
+                '!inlineCompletions',
+                '!inspectTokens',
+                '!quickCommand',
+                '!quickHelp',
+                '!quickOutline',
+                '!referenceSearch',
+                '!rename',
+                '!sectionHeaders',
+                '!semanticTokens',
+                '!smartSelect',
+                '!stickyScroll',
+                '!unicodeHighlighter',
+                '!wordHighlighter',
+            ],
         }),
         new HtmlWebpackPlugin({
             template: 'src/index.html'
@@ -50,7 +78,9 @@ const config = {
         }),
     ],
     experiments: {
-        asyncWebAssembly: true
+        asyncWebAssembly: true,
+        css: false,
+        futureDefaults: true,
     }
 };
 

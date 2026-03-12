@@ -1,3 +1,9 @@
+@font-face {
+    font-family: "Cascadia Code";
+    src: url("./CascadiaMono.woff2") format("woff2");
+    font-display: swap;
+}
+
 html {
     overflow: hidden;
 }

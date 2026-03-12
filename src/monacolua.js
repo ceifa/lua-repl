@@ -1,3 +1,4 @@
+import 'monaco-editor/esm/vs/basic-languages/lua/lua.contribution.js'
 import { languages, editor } from 'monaco-editor/esm/vs/editor/editor.api.js'
 import globals from './globals.json'
 

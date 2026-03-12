@@ -1,4 +1,12 @@
-import defaultScript from './default.lua'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import './assets/index.css'
+import defaultScript from './default.lua?raw'
+
+self.MonacoEnvironment = {
+    getWorker() {
+        return new editorWorker()
+    },
+}
 
 const editorEl = document.getElementById('editor')
 const outputEl = document.getElementById('output')
@@ -45,6 +53,7 @@ const createRunner = () => {
     if (!runner) {
         runner = new Worker(new URL('./runner.js', import.meta.url), {
             name: 'Lua runner',
+            type: 'module',
         })
     }
 

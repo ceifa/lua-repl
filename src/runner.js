@@ -1,4 +1,4 @@
-import wasmFile from 'wasmoon/dist/glue.wasm'
+import wasmFile from 'wasmoon/dist/glue.wasm?url'
 import { decorateFunction, LuaFactory } from 'wasmoon'
 
 const factory = new LuaFactory(wasmFile)

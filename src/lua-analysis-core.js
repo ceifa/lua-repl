@@ -664,7 +664,7 @@ const analyzeWithAst = (analysis, ast) => {
     const lastLineLength = lines.at(-1)?.length || 0
     const rootScope = createScope(
         scopeId,
-        makePosition(ast.loc?.start || { line: 1, column: 0 }),
+        createPosition(1, 0),
         createPosition(totalLines, lastLineLength),
         null,
         'root'

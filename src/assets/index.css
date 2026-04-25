@@ -75,6 +75,12 @@ pre {
     overflow: auto;
 }
 
+.stats {
+    margin-top: 1em;
+    color: #888888;
+    font-size: 0.85em;
+}
+
 .github {
     position: absolute;
     bottom: 1em;

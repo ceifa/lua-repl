@@ -1,12 +1,12 @@
 import wasmFile from 'wasmoon/dist/glue.wasm?url'
-import { LuaFactory } from 'wasmoon'
+import { Lua } from 'wasmoon'
 import { registerRuntimeHelpers } from './lua-runtime'
 
-let factory
+let luaPromise
 
-const createFactory = () => {
-    factory ||= new LuaFactory(wasmFile)
-    return factory
+const getLua = () => {
+    luaPromise ||= Lua.load({ wasmFile })
+    return luaPromise
 }
 
 const clampLine = (line, totalLines) => Math.min(Math.max(line, 1), Math.max(totalLines, 1))
@@ -53,8 +53,8 @@ const parseRuntimeError = (source, message) => {
 }
 
 export const validateLuaSource = async (source, options = {}) => {
-    const factory = createFactory()
-    const state = await factory.createEngine()
+    const lua = await getLua()
+    const state = lua.createState()
 
     try {
         registerRuntimeHelpers(state)

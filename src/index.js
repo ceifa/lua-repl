@@ -12,7 +12,14 @@ const editorEl = document.getElementById('editor')
 const outputEl = document.getElementById('output')
 const currentActionEl = document.getElementById('current-action')
 
-outputEl.innerHTML = '<span>Press Ctrl + E to run the code.</span>'
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
+const cmdKey = isMac ? 'Cmd' : 'Ctrl'
+
+for (const el of document.querySelectorAll('[data-cmd-key]')) {
+    el.textContent = el.textContent.replace(/Ctrl/g, cmdKey)
+}
+
+outputEl.innerHTML = `<span>Press ${cmdKey} + Enter to run the code.</span>`
 
 let monacoEditor
 let monacoApi
@@ -45,6 +52,18 @@ const applySharedPaste = async () => {
     }
 }
 
+const formatDuration = (ms) => {
+    if (ms < 1) return `${ms.toFixed(2)}ms`
+    if (ms < 1000) return `${ms.toFixed(0)}ms`
+    return `${(ms / 1000).toFixed(2)}s`
+}
+
+const formatBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
 const createRunner = () => {
     if (runner && isRunning) {
         runner.terminate()
@@ -66,6 +85,16 @@ const createRunner = () => {
         if (type === 'finished') {
             outputEl.style.color = '#FFFFFF'
             isRunning = false
+            if (data) {
+                const statsEl = document.createElement('div')
+                statsEl.className = 'stats'
+                const parts = [formatDuration(data.duration)]
+                if (typeof data.memoryUsed === 'number') {
+                    parts.push(formatBytes(data.memoryUsed))
+                }
+                statsEl.innerText = parts.join(' · ')
+                outputEl.appendChild(statsEl)
+            }
         } else if (type === 'log') {
             const logEl = document.createElement('pre')
             logEl.innerText = data
@@ -112,14 +141,14 @@ const setEditorActions = () => {
     monacoEditor.addAction({
         id: 'execute-action',
         label: 'Execute code',
-        keybindings: [KeyMod.CtrlCmd | KeyCode.KeyE],
+        keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
         run: runLua,
     })
 
     monacoEditor.addAction({
         id: 'stop-action',
         label: 'Stop running code',
-        keybindings: [KeyMod.CtrlCmd | KeyCode.KeyM],
+        keybindings: [KeyMod.CtrlCmd | KeyCode.Period],
         run: stopLua,
     })
 
